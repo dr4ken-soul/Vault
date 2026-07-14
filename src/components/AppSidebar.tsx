@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
-import { useWalletStore } from '../stores/walletStore'
-import { formatUsdt, shortAddress } from '../lib/format'
+import { WalletDropdown } from './WalletDropdown'
 
 const links = [
   { to: '/app', label: 'Dashboard', end: true },
@@ -13,10 +12,6 @@ const links = [
 ]
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
-  const address = useWalletStore((s) => s.address)
-  const usdtBalance = useWalletStore((s) => s.usdtBalance)
-  const disconnect = useWalletStore((s) => s.disconnect)
-
   return (
     <>
       <div className="border-b border-[var(--border-subtle)] px-5 py-5">
@@ -49,21 +44,9 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
+      {/* Bottom-left wallet control (same placement as before, full dropdown) */}
       <div className="border-t border-[var(--border-subtle)] p-3">
-        <div className="surface p-3">
-          <p className="mb-1 text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-            Wallet
-          </p>
-          <p className="font-mono text-xs text-[var(--text-primary)]">
-            {address ? shortAddress(address, 5) : 'n/a'}
-          </p>
-          <p className="mt-2 font-mono text-sm text-[var(--accent)]">
-            {formatUsdt(usdtBalance)} USDt
-          </p>
-          <button type="button" className="btn-ghost mt-3 w-full text-xs" onClick={disconnect}>
-            Disconnect
-          </button>
-        </div>
+        <WalletDropdown />
       </div>
     </>
   )
@@ -74,8 +57,7 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* Mobile top bar */}
-      <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-[var(--border-default)] bg-[rgba(8,10,15,0.88)] px-4 backdrop-blur-md md:hidden">
+      <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-[var(--border-default)] bg-[rgba(8,10,15,0.88)] px-4 backdrop-blur-md md:hidden">
         <div className="font-display text-xl text-[var(--text-primary)]">Vault</div>
         <button
           type="button"
@@ -87,12 +69,10 @@ export function AppSidebar() {
         </button>
       </div>
 
-      {/* Desktop sidebar */}
       <aside className="fixed bottom-0 left-0 top-0 z-40 hidden w-56 flex-col border-r border-[var(--border-default)] bg-[rgba(8,10,15,0.55)] backdrop-blur-sm md:flex">
         <NavItems />
       </aside>
 
-      {/* Mobile drawer */}
       <AnimatePresence>
         {open ? (
           <>

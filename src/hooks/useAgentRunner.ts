@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { runAgentLoop } from '../services/agent/loop'
 import { useAgentStore } from '../stores/agentStore'
 import { persistSquads, useSquadStore } from '../stores/squadStore'
@@ -10,11 +10,14 @@ let cycleLock = false
 function mapStatus(statusText: string): 'evaluating' | 'negotiating' | 'settling' | 'idle' {
   if (/negotiat/i.test(statusText)) return 'negotiating'
   if (/settl/i.test(statusText)) return 'settling'
-  if (/idle|complete|waiting|watching|blocked|declined/i.test(statusText)) return 'idle'
+  if (/idle|complete|waiting|watching|blocked|declined|ready/i.test(statusText)) return 'idle'
   return 'evaluating'
 }
 
-/** Shared agent cycle used by the interval runner and the dashboard button. */
+/**
+ * Manual agent cycle only. Nothing auto-runs inside the app.
+ * Landing page live proof is separate and stays decorative.
+ */
 export async function triggerAgentCycle(): Promise<void> {
   const wallet = useWalletStore.getState()
   if (!wallet.connected || !wallet.liveWallet || !wallet.counterpart) return
@@ -23,6 +26,11 @@ export async function triggerAgentCycle(): Promise<void> {
   cycleLock = true
   useAgentStore.getState().setLoopRunning(true)
   useAgentStore.getState().setStatus('evaluating')
+  useAgentStore.getState().setProgress({
+    status: 'evaluating',
+    currentStep: 'Starting evaluation',
+    liveReasoning: 'On-device agent cycle started by you.',
+  })
 
   try {
     const squad = useSquadStore.getState()
@@ -62,16 +70,20 @@ export async function triggerAgentCycle(): Promise<void> {
     useAgentStore.getState().prependLogs(result.logs)
     useAgentStore.getState().setProgress({
       status: 'idle',
-      currentStep: result.currentStep,
-      liveReasoning: result.liveReasoning,
+      currentStep: 'Ready for next cycle',
+      liveReasoning:
+        result.liveReasoning ||
+        'Cycle complete. Press Run agent cycle whenever you want another evaluation.',
     })
     useAgentStore.getState().markSync()
   } catch (err) {
     useAgentStore.getState().setProgress({
       status: 'idle',
-      currentStep: 'Agent cycle error',
+      currentStep: 'Ready to retry',
       liveReasoning:
-        err instanceof Error ? err.message : 'Agent cycle failed. Will retry on the next loop.',
+        err instanceof Error
+          ? err.message
+          : 'Agent cycle failed. You can run another cycle when ready.',
     })
   } finally {
     cycleLock = false
@@ -80,41 +92,31 @@ export async function triggerAgentCycle(): Promise<void> {
 }
 
 /**
- * Starts the autonomous agent loop once a wallet is connected.
- * Cycles periodically so the dashboard always has live activity for demos.
+ * Loads any saved trades for this wallet. Does NOT auto-run the agent.
  */
-export function useAgentRunner(enabled: boolean) {
-  const timerRef = useRef<number | null>(null)
-
-  const runOnce = useCallback(async () => {
-    await triggerAgentCycle()
-  }, [])
-
+export function useAgentSessionHydration(enabled: boolean) {
   useEffect(() => {
-    if (!enabled) {
-      if (timerRef.current) window.clearInterval(timerRef.current)
-      return
-    }
+    if (!enabled) return
 
     const wallet = useWalletStore.getState()
-    if (wallet.address) {
-      const existing = loadTrades(wallet.address)
-      if (existing.length) useTradeStore.getState().setTrades(existing)
+    if (!wallet.address) return
+
+    const existing = loadTrades(wallet.address)
+    if (existing.length) {
+      useTradeStore.getState().setTrades(existing)
+    } else {
+      useTradeStore.getState().setTrades([])
     }
 
-    const boot = window.setTimeout(() => {
-      void runOnce()
-    }, 1200)
-
-    timerRef.current = window.setInterval(() => {
-      void runOnce()
-    }, 45000)
-
-    return () => {
-      window.clearTimeout(boot)
-      if (timerRef.current) window.clearInterval(timerRef.current)
+    // Fresh connected session messaging if the agent has never run
+    const agent = useAgentStore.getState()
+    if (!agent.lastSyncAt && agent.logs.length === 0) {
+      agent.setProgress({
+        status: 'idle',
+        currentStep: 'Ready',
+        liveReasoning:
+          'Agent is idle and waiting. Idle means ready, not blocked. Press Run agent cycle to evaluate the squad and attempt a trade.',
+      })
     }
-  }, [enabled, runOnce])
-
-  return { runOnce }
+  }, [enabled])
 }

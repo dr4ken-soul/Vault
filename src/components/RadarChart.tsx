@@ -1,5 +1,7 @@
-import { motion, useReducedMotion } from 'motion/react'
+import { motion, useInView, useReducedMotion } from 'motion/react'
+import { useRef } from 'react'
 import type { PlayerAttributes } from '../lib/types'
+import { vaultEase } from '../lib/motion'
 
 const LABELS: { key: keyof PlayerAttributes; label: string }[] = [
   { key: 'pace', label: 'PAC' },
@@ -26,6 +28,8 @@ export function RadarChart({
   size?: number
 }) {
   const reduce = useReducedMotion()
+  const ref = useRef<SVGSVGElement>(null)
+  const inView = useInView(ref, { amount: 0.4 })
   const cx = size / 2
   const cy = size / 2
   const maxR = size * 0.36
@@ -39,7 +43,7 @@ export function RadarChart({
   const area = points.map((p) => `${p.x},${p.y}`).join(' ')
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+    <svg ref={ref} width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
       {levels.map((level) => {
         const ring = LABELS.map((_, i) => {
           const p = polar(cx, cy, maxR * level, i, LABELS.length)
@@ -54,16 +58,21 @@ export function RadarChart({
       <motion.polygon
         points={area}
         className="radar-area"
-        initial={reduce ? false : { opacity: 0, scale: 0.72 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true, amount: 0.4 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         style={{ transformOrigin: `${cx}px ${cy}px` }}
+        initial={false}
+        animate={
+          reduce
+            ? { opacity: 1, scale: 1 }
+            : inView
+              ? { opacity: 1, scale: 1 }
+              : { opacity: 0, scale: 0.55 }
+        }
+        transition={{ duration: 0.75, ease: vaultEase }}
       />
       {LABELS.map((item, i) => {
         const p = polar(cx, cy, maxR + size * 0.1, i, LABELS.length)
         return (
-          <text
+          <motion.text
             key={item.key}
             x={p.x}
             y={p.y}
@@ -72,9 +81,18 @@ export function RadarChart({
             fill="var(--text-muted)"
             fontSize={size * 0.055}
             fontFamily="var(--font-mono)"
+            initial={false}
+            animate={
+              reduce
+                ? { opacity: 1 }
+                : inView
+                  ? { opacity: 1 }
+                  : { opacity: 0 }
+            }
+            transition={{ duration: 0.45, delay: inView ? 0.08 * i : 0, ease: vaultEase }}
           >
             {item.label}
-          </text>
+          </motion.text>
         )
       })}
     </svg>

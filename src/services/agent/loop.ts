@@ -93,7 +93,7 @@ export async function runAgentLoop(
         'No counterpart holding cleared the form efficiency and spending limit filters in this cycle.',
     })
     currentStep = 'idle'
-    push('Idle. Waiting for the next cycle.', logs[logs.length - 1].detail)
+    push('Ready for next cycle.', logs[logs.length - 1].detail)
     return {
       userSquadIds: ctx.userSquadIds,
       counterpartSquadIds: ctx.counterpartSquadIds,
@@ -103,7 +103,7 @@ export async function runAgentLoop(
       logs,
       statusTrail,
       liveReasoning,
-      currentStep: 'Watching market and form feeds',
+      currentStep: 'Ready for next cycle',
     }
   }
 
@@ -172,7 +172,7 @@ export async function runAgentLoop(
       logs,
       statusTrail,
       liveReasoning,
-      currentStep: 'Watching market and form feeds',
+      currentStep: 'Ready for next cycle',
     }
   }
 
@@ -290,7 +290,7 @@ export async function runAgentLoop(
   }
 
   currentStep = 'idle'
-  push('Settlement complete. Agent returning to watch state.', settleDetail)
+  push('Settlement complete. Ready for next cycle.', settleDetail)
 
   return {
     userSquadIds,
@@ -301,6 +301,6 @@ export async function runAgentLoop(
     logs,
     statusTrail,
     liveReasoning: settleDetail,
-    currentStep: 'Watching market and form feeds',
+    currentStep: 'Ready for next cycle',
   }
 }

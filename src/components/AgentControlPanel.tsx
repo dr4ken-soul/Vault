@@ -4,6 +4,12 @@ import { motion } from 'motion/react'
 import { useAgentStore } from '../stores/agentStore'
 import { formatRelativeTime } from '../lib/format'
 
+function statusLabel(status: string, loopRunning: boolean): string {
+  if (loopRunning) return status
+  if (status === 'idle') return 'ready'
+  return status
+}
+
 export function AgentControlPanel({ onRunCycle }: { onRunCycle?: () => void }) {
   const status = useAgentStore((s) => s.status)
   const currentStep = useAgentStore((s) => s.currentStep)
@@ -11,8 +17,9 @@ export function AgentControlPanel({ onRunCycle }: { onRunCycle?: () => void }) {
   const lastSyncAt = useAgentStore((s) => s.lastSyncAt)
   const loopRunning = useAgentStore((s) => s.loopRunning)
 
-  const busy = status === 'evaluating' || status === 'negotiating' || status === 'settling'
-  const pillClass = busy ? 'status-pill busy' : status === 'idle' ? 'status-pill idle' : 'status-pill'
+  const busy = loopRunning || status === 'evaluating' || status === 'negotiating' || status === 'settling'
+  const displayStatus = statusLabel(status, loopRunning)
+  const pillClass = busy ? 'status-pill busy' : 'status-pill live'
 
   return (
     <aside className="surface-filled flex h-full flex-col p-4">
@@ -26,7 +33,7 @@ export function AgentControlPanel({ onRunCycle }: { onRunCycle?: () => void }) {
           </motion.span>
           <h2 className="font-display text-lg text-[var(--text-primary)]">Agent</h2>
         </div>
-        <span className={`${pillClass} ${busy ? 'pulse-dot' : ''}`}>{status}</span>
+        <span className={pillClass}>{displayStatus}</span>
       </div>
 
       <div className="mb-4 space-y-3">
@@ -64,21 +71,28 @@ export function AgentControlPanel({ onRunCycle }: { onRunCycle?: () => void }) {
             Last decision
           </p>
           <p className="font-mono text-xs text-[var(--text-muted)]">
-            {lastSyncAt ? formatRelativeTime(lastSyncAt) : 'Awaiting first cycle'}
+            {lastSyncAt ? formatRelativeTime(lastSyncAt) : 'No cycle run yet'}
           </p>
         </div>
       </div>
 
       <div className="mt-auto space-y-3 border-t border-[var(--border-subtle)] pt-3">
         {onRunCycle ? (
-          <button
-            type="button"
-            className="btn-primary w-full py-2 text-sm"
-            onClick={onRunCycle}
-            disabled={loopRunning}
-          >
-            {loopRunning ? 'Cycle running...' : 'Run agent cycle'}
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn-primary w-full py-2 text-sm"
+              onClick={onRunCycle}
+              disabled={loopRunning}
+            >
+              {loopRunning ? 'Cycle running...' : 'Run agent cycle'}
+            </button>
+            <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
+              {loopRunning
+                ? 'Wait for this cycle to finish, then you can run another.'
+                : 'Ready means the agent is free. Click above to evaluate, negotiate, and settle.'}
+            </p>
+          </>
         ) : null}
         <Link
           to="/app/agent"

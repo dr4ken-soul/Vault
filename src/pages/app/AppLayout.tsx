@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'motion/react'
 import { AppSidebar } from '../../components/AppSidebar'
-import { useAgentRunner } from '../../hooks/useAgentRunner'
+import { useAgentSessionHydration } from '../../hooks/useAgentRunner'
 import { useAgentStore } from '../../stores/agentStore'
 import { useSquadStore } from '../../stores/squadStore'
 import { useTradeStore } from '../../stores/tradeStore'
@@ -12,13 +12,14 @@ export function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const ready = useWalletStore((s) => s.ready)
+  const reconnecting = useWalletStore((s) => s.reconnecting)
   const connected = useWalletStore((s) => s.connected)
   const address = useWalletStore((s) => s.address)
   const initForWallet = useSquadStore((s) => s.initForWallet)
   const resetAgent = useAgentStore((s) => s.reset)
   const resetTrades = useTradeStore((s) => s.reset)
 
-  useAgentRunner(ready && connected)
+  useAgentSessionHydration(ready && connected && !reconnecting)
 
   useEffect(() => {
     if (connected && address) {
@@ -27,14 +28,14 @@ export function AppLayout() {
   }, [connected, address, initForWallet])
 
   useEffect(() => {
-    if (ready && !connected) {
+    if (ready && !reconnecting && !connected) {
       resetAgent()
       resetTrades()
-      navigate('/?connect=1', { replace: true })
+      navigate('/', { replace: true, state: { disconnected: true } })
     }
-  }, [ready, connected, navigate, resetAgent, resetTrades])
+  }, [ready, reconnecting, connected, navigate, resetAgent, resetTrades])
 
-  if (!ready) {
+  if (!ready || reconnecting) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
         <div className="text-center">
@@ -46,7 +47,7 @@ export function AppLayout() {
   }
 
   if (!connected) {
-    return <Navigate to="/?connect=1" replace />
+    return <Navigate to="/" replace />
   }
 
   return (
@@ -54,6 +55,7 @@ export function AppLayout() {
       <div className="app-starfield" />
       <div className="noise-overlay" aria-hidden />
       <AppSidebar />
+
       <main className="relative z-10 min-h-screen pt-14 md:pl-56 md:pt-0">
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
           <AnimatePresence mode="wait">

@@ -22,8 +22,9 @@ interface AgentStore {
 
 export const useAgentStore = create<AgentStore>((set) => ({
   status: 'idle',
-  currentStep: 'Waiting for wallet connection',
-  liveReasoning: 'Connect a WDK wallet to start the on-device agent.',
+  currentStep: 'Ready',
+  liveReasoning:
+    'Agent is idle and waiting. Idle means ready, not blocked. Press Run agent cycle to evaluate the squad and attempt a trade.',
   lastSyncAt: null,
   logs: [],
   loopRunning: false,
@@ -58,8 +59,9 @@ export const useAgentStore = create<AgentStore>((set) => ({
   reset() {
     set({
       status: 'idle',
-      currentStep: 'Waiting for wallet connection',
-      liveReasoning: 'Connect a WDK wallet to start the on-device agent.',
+      currentStep: 'Ready',
+      liveReasoning:
+        'Agent is idle and waiting. Idle means ready, not blocked. Press Run agent cycle to evaluate the squad and attempt a trade.',
       lastSyncAt: null,
       logs: [],
       loopRunning: false,

@@ -12,6 +12,12 @@ import { useSquadStore } from '../../stores/squadStore'
 import { useTradeStore } from '../../stores/tradeStore'
 import { useWalletStore } from '../../stores/walletStore'
 
+function statusLabel(status: string, loopRunning: boolean): string {
+  if (loopRunning) return status
+  if (status === 'idle') return 'ready'
+  return status
+}
+
 export function Dashboard() {
   const playerIds = useSquadStore((s) => s.userPlayerIds)
   const usdtBalance = useWalletStore((s) => s.usdtBalance)
@@ -23,6 +29,7 @@ export function Dashboard() {
 
   const loading = playerIds.length === 0
   const value = squadValue(playerIds)
+  const hasActivity = trades.length > 0 || Boolean(lastSyncAt)
 
   return (
     <PageTransition>
@@ -30,14 +37,19 @@ export function Dashboard() {
         <div className="min-w-0">
           <BlurInMount>
             <p className="mb-2 font-mono text-[11px] text-[var(--text-muted)]">
-              Last updated{' '}
-              {lastSyncAt ? formatRelativeTime(lastSyncAt) : loopRunning ? 'syncing...' : 'pending'}
+              Last cycle{' '}
+              {lastSyncAt
+                ? formatRelativeTime(lastSyncAt)
+                : loopRunning
+                  ? 'running...'
+                  : 'none yet'}
             </p>
             <h1 className="font-display text-3xl text-[var(--text-primary)] md:text-4xl">
               Dashboard
             </h1>
             <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              Live view of squad value, agent activity, and WDK settlement feed.
+              Manual control. Nothing runs until you start an agent cycle. Landing page live proof
+              is separate.
             </p>
           </BlurInMount>
 
@@ -47,7 +59,12 @@ export function Dashboard() {
             ) : (
               <>
                 <KpiTile label="Squad value" value={value} countUp suffix="USDt" delay={0.02} />
-                <KpiTile label="Agent status" value={status} mono delay={0.06} />
+                <KpiTile
+                  label="Agent status"
+                  value={statusLabel(status, loopRunning)}
+                  mono
+                  delay={0.06}
+                />
                 <KpiTile label="Open trades" value={String(openCount)} delay={0.1} />
                 <KpiTile
                   label="USDt balance"
@@ -62,11 +79,33 @@ export function Dashboard() {
 
           <BlurInMount delay={0.16}>
             <div className="mt-8">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="font-display text-xl text-[var(--text-primary)]">Trade feed</h2>
-                <span className="status-pill live">Live</span>
+                <span className={`status-pill ${hasActivity ? 'live' : 'idle'}`}>
+                  {hasActivity ? 'Manual' : 'Empty'}
+                </span>
               </div>
-              <TradeFeed trades={trades} loading={loading && trades.length === 0} />
+
+              {!hasActivity && !loopRunning ? (
+                <div className="surface mb-3 p-5">
+                  <p className="font-display text-lg text-[var(--text-primary)]">No trades yet</p>
+                  <p className="mt-2 max-w-lg text-sm leading-relaxed text-[var(--text-secondary)]">
+                    First-time sessions start clean so you can test the full loop yourself. Use{' '}
+                    <span className="text-[var(--text-primary)]">Run agent cycle</span> in the
+                    panel. Watch evaluate, negotiate, settle, then the feed and balance update.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-primary mt-4"
+                    onClick={() => void triggerAgentCycle()}
+                    disabled={loopRunning}
+                  >
+                    Run first agent cycle
+                  </button>
+                </div>
+              ) : null}
+
+              <TradeFeed trades={trades} loading={false} />
             </div>
           </BlurInMount>
         </div>

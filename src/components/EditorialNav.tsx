@@ -12,7 +12,6 @@ export function EditorialNav({
   connectFocus?: boolean
 }) {
   const connected = useWalletStore((s) => s.connected)
-  const connecting = useWalletStore((s) => s.connecting)
   const address = useWalletStore((s) => s.address)
   const usdtBalance = useWalletStore((s) => s.usdtBalance)
   const playerIds = useSquadStore((s) => s.userPlayerIds)
@@ -48,17 +47,20 @@ export function EditorialNav({
 
         <div>
           {connected && address ? (
-            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 font-mono text-xs text-[var(--text-secondary)]">
-              {shortAddress(address)}
-            </div>
+            <button
+              type="button"
+              className="btn-primary px-4 py-2 text-sm"
+              onClick={onConnect}
+            >
+              Enter dashboard
+            </button>
           ) : (
             <button
               type="button"
               className={`btn-primary px-4 py-2 text-sm ${connectFocus ? 'cta-focus-ring' : ''}`}
               onClick={onConnect}
-              disabled={connecting}
             >
-              {connecting ? 'Creating wallet...' : 'Connect wallet'}
+              Connect wallet
             </button>
           )}
         </div>

@@ -1,27 +1,37 @@
-import { motion, useReducedMotion } from 'motion/react'
-import type { ReactNode } from 'react'
-
-const ease = [0.22, 1, 0.36, 1] as const
+import { motion, useInView, useReducedMotion } from 'motion/react'
+import { useRef, type ReactNode } from 'react'
+import {
+  mountVariants,
+  staggerContainer,
+  staggerItem,
+  vaultEase,
+} from '../lib/motion'
 
 /**
- * Standard Vault entrance: blur + fade + lift.
- * Use `once` scroll reveals on long pages so motion is visible while scrolling.
+ * Scroll-linked reveal that REPLAYS every time the block enters the viewport
+ * (scroll down or back up). Leaving the viewport returns it to hidden so the
+ * next entry can animate again.
  */
 export function BlurIn({
   children,
   delay = 0,
   className = '',
-  once = true,
-  amount = 0.2,
+  amount = 0.25,
+  /** API compatibility only. Scroll reveals always replay. */
+  once: _once = false,
 }: {
   children: ReactNode
   delay?: number
   className?: string
-  /** When true, animates when entering the viewport (landing sections). */
-  once?: boolean
   amount?: number
+  once?: boolean
 }) {
+  const ref = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
+  const inView = useInView(ref, {
+    amount,
+    margin: '0px 0px -10% 0px',
+  })
 
   if (reduce) {
     return <div className={className}>{children}</div>
@@ -29,18 +39,86 @@ export function BlurIn({
 
   return (
     <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 18, filter: 'blur(10px)' }}
-      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      viewport={{ once, amount, margin: '0px 0px -40px 0px' }}
-      transition={{ duration: 0.65, delay, ease }}
+      ref={ref}
+      className={`reveal-layer ${className}`.trim()}
+      initial={false}
+      animate={
+        inView
+          ? {
+              opacity: 1,
+              y: 0,
+              filter: 'blur(0px)',
+              scale: 1,
+            }
+          : {
+              opacity: 0,
+              y: 56,
+              filter: 'blur(16px)',
+              scale: 0.97,
+            }
+      }
+      transition={{
+        duration: inView ? 0.8 : 0.4,
+        ease: inView ? vaultEase : [0.4, 0, 1, 1],
+        delay: inView ? delay : 0,
+      }}
     >
       {children}
     </motion.div>
   )
 }
 
-/** Instant mount animation for app shell content (no scroll dependency). */
+/**
+ * Staggered group that replays whenever it leaves and re-enters the viewport.
+ */
+export function StaggerReveal({
+  children,
+  className = '',
+  amount = 0.18,
+}: {
+  children: ReactNode
+  className?: string
+  amount?: number
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const reduce = useReducedMotion()
+  const inView = useInView(ref, {
+    amount,
+    margin: '0px 0px -8% 0px',
+  })
+
+  if (reduce) {
+    return <div className={className}>{children}</div>
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      className={`reveal-layer ${className}`.trim()}
+      initial="hidden"
+      animate={inView ? 'visible' : 'hidden'}
+      variants={staggerContainer}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+export function StaggerItem({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <motion.div className={className} variants={staggerItem}>
+      {children}
+    </motion.div>
+  )
+}
+
+/** Mount-only animation for app routes (no scroll dependency). */
 export function BlurInMount({
   children,
   delay = 0,
@@ -58,10 +136,11 @@ export function BlurInMount({
 
   return (
     <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 14, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={{ duration: 0.55, delay, ease }}
+      className={`reveal-layer ${className}`.trim()}
+      variants={mountVariants}
+      initial="hidden"
+      animate="visible"
+      transition={{ delay }}
     >
       {children}
     </motion.div>

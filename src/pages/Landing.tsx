@@ -1,90 +1,151 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 import { EditorialNav } from '../components/EditorialNav'
 import { PlayerTile } from '../components/PlayerTile'
 import { LiveProofFeed } from '../components/LiveProofFeed'
-import { BlurIn } from '../components/BlurIn'
+import { BlurIn, StaggerItem, StaggerReveal } from '../components/BlurIn'
+import { WalletConnectModal } from '../components/WalletConnectModal'
+import { DisconnectToast } from '../components/DisconnectToast'
 import { getPlayer } from '../lib/players'
+import { vaultEase } from '../lib/motion'
 import { useWalletStore } from '../stores/walletStore'
 import { useSquadStore } from '../stores/squadStore'
 
+const LOOP_STEPS = [
+  {
+    n: '01',
+    t: 'Build the squad',
+    d: 'Roster is data, not cards. Positions, form, value, and traits the agent can actually reason over.',
+  },
+  {
+    n: '02',
+    t: 'Watch form and value',
+    d: 'The QVAC path evaluates composition continuously on your machine. Nothing leaves the device during reasoning.',
+  },
+  {
+    n: '03',
+    t: 'Trade autonomously',
+    d: 'When a better deal exists, agents negotiate. On acceptance, WDK settles USDt between wallets.',
+  },
+]
+
 export function Landing() {
   const navigate = useNavigate()
-  const connect = useWalletStore((s) => s.connect)
-  const connecting = useWalletStore((s) => s.connecting)
+  const location = useLocation()
   const connected = useWalletStore((s) => s.connected)
   const address = useWalletStore((s) => s.address)
   const initForWallet = useSquadStore((s) => s.initForWallet)
   const [connectFocus, setConnectFocus] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [showDisconnectToast, setShowDisconnectToast] = useState(false)
   const ctaRef = useRef<HTMLButtonElement>(null)
+  const heroRef = useRef<HTMLElement>(null)
+  const reduce = useReducedMotion()
+
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  })
+  const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '18%'])
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.85], [1, 0.35])
+  const heroScale = useTransform(scrollYProgress, [0, 1], [1.05, 1.12])
+
+  const openModal = useCallback(() => setShowModal(true), [])
+  const closeModal = useCallback(() => setShowModal(false), [])
+
+  const handleLaunch = useCallback(() => {
+    if (connected) navigate('/app')
+    else openModal()
+  }, [connected, navigate, openModal])
 
   useEffect(() => {
-    if (connected && address) {
+    if (connected && address && !showModal) {
       initForWallet(address)
-      navigate('/app')
     }
-  }, [connected, address, initForWallet, navigate])
+  }, [connected, address, initForWallet, showModal])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('connect') === '1') {
       setConnectFocus(true)
+      openModal()
       ctaRef.current?.focus()
     }
-  }, [])
+  }, [openModal])
 
-  const handleConnect = async () => {
-    await connect()
-  }
+  useEffect(() => {
+    const state = location.state as { disconnected?: boolean } | null
+    if (state?.disconnected) {
+      setShowDisconnectToast(true)
+      window.history.replaceState({}, '')
+    }
+  }, [location.state])
 
   const previewPlayer = getPlayer('p-saka')!
 
   return (
     <div className="relative min-h-screen bg-[var(--bg-primary)]">
       <div className="noise-overlay" aria-hidden />
-      <EditorialNav onConnect={handleConnect} connectFocus={connectFocus} />
+      <EditorialNav onConnect={handleLaunch} connectFocus={connectFocus} />
+      <DisconnectToast
+        show={showDisconnectToast}
+        onDismiss={() => setShowDisconnectToast(false)}
+      />
+      <WalletConnectModal isOpen={showModal} onClose={closeModal} />
 
       {/* Hero */}
-      <section className="relative flex min-h-screen items-end overflow-hidden pb-20 pt-24">
-        <video
-          className="absolute inset-0 h-full w-full scale-105 object-cover"
-          src="/vault-hero-bg.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-          aria-hidden
-        />
+      <section
+        ref={heroRef}
+        className="relative flex min-h-screen items-end overflow-hidden pb-20 pt-24"
+      >
+        <motion.div
+          className="absolute inset-0"
+          style={reduce ? undefined : { y: heroY, opacity: heroOpacity }}
+        >
+          <motion.video
+            className="absolute inset-0 h-full w-full object-cover"
+            src="/vault-hero-bg.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            aria-hidden
+            style={reduce ? undefined : { scale: heroScale }}
+          />
+        </motion.div>
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-primary)] via-[rgba(8,10,15,0.4)] to-[rgba(8,10,15,0.15)]" />
         <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[var(--bg-primary)] to-transparent" />
 
         <div className="container-narrow relative z-10 w-full px-6">
-          <BlurIn once={false}>
+          <BlurIn>
             <p className="section-kicker">Tether Developers Cup · QVAC + WDK</p>
             <div className="hero-rule" />
             <h1 className="max-w-3xl font-display text-4xl leading-[1.06] text-[var(--text-primary)] md:text-6xl lg:text-[4.25rem]">
               An agent that runs your squad and trades on your behalf, settled in USDt.
             </h1>
           </BlurIn>
-          <BlurIn delay={0.1} once={false}>
+          <BlurIn delay={0.12}>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--text-secondary)] md:text-lg">
               QVAC evaluates form on your device. WDK moves USDt when two agents agree. No cloud
               reasoning path. No manual approval step.
             </p>
           </BlurIn>
-          <BlurIn delay={0.18} once={false}>
+          <BlurIn delay={0.2}>
             <div className="mt-9 flex flex-wrap items-center gap-4">
-              <button
+              <motion.button
                 ref={ctaRef}
                 type="button"
                 className={`btn-primary ${connectFocus ? 'cta-focus-ring' : ''}`}
-                onClick={handleConnect}
-                disabled={connecting}
+                onClick={handleLaunch}
+                whileHover={reduce ? undefined : { scale: 1.03, y: -2 }}
+                whileTap={reduce ? undefined : { scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 24 }}
               >
-                {connecting ? 'Creating WDK wallet...' : 'Connect wallet and enter demo'}
-              </button>
+                {connected ? 'Enter dashboard' : 'Connect wallet and enter demo'}
+              </motion.button>
               <p className="font-mono text-[11px] tracking-wide text-[var(--text-muted)]">
-                SELF-CUSTODIAL · ON DEVICE · MATCHDAY AMBER
+                SELF-CUSTODIAL WDK · ON DEVICE · MATCHDAY AMBER
               </p>
             </div>
           </BlurIn>
@@ -103,26 +164,19 @@ export function Landing() {
               Four steps. Continuous. On device until settlement.
             </p>
           </BlurIn>
-          <div className="mt-12 grid gap-4 md:grid-cols-3">
-            {[
-              {
-                n: '01',
-                t: 'Build the squad',
-                d: 'Roster is data, not cards. Positions, form, value, and traits the agent can actually reason over.',
-              },
-              {
-                n: '02',
-                t: 'Watch form and value',
-                d: 'The QVAC path evaluates composition continuously on your machine. Nothing leaves the device during reasoning.',
-              },
-              {
-                n: '03',
-                t: 'Trade autonomously',
-                d: 'When a better deal exists, agents negotiate. On acceptance, WDK settles USDt between wallets.',
-              },
-            ].map((step, i) => (
-              <BlurIn key={step.n} delay={0.08 * i}>
-                <div className="surface surface-interactive group h-full p-6 md:p-7">
+
+          <StaggerReveal className="mt-12 grid gap-4 md:grid-cols-3">
+            {LOOP_STEPS.map((step) => (
+              <StaggerItem key={step.n}>
+                <motion.div
+                  className="surface surface-interactive group h-full p-6 md:p-7"
+                  whileHover={
+                    reduce
+                      ? undefined
+                      : { y: -4, borderColor: 'rgba(240, 160, 48, 0.28)' }
+                  }
+                  transition={{ type: 'spring', stiffness: 360, damping: 26 }}
+                >
                   <p className="font-mono text-sm text-[var(--accent)]">{step.n}</p>
                   <h3 className="mt-4 font-display text-xl text-[var(--text-primary)] md:text-2xl">
                     {step.t}
@@ -130,10 +184,10 @@ export function Landing() {
                   <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
                     {step.d}
                   </p>
-                </div>
-              </BlurIn>
+                </motion.div>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerReveal>
         </div>
       </section>
 
@@ -150,7 +204,7 @@ export function Landing() {
               Two agents. An offer. An accepted counter. A settled USDt amount.
             </p>
           </BlurIn>
-          <BlurIn delay={0.12}>
+          <BlurIn delay={0.1}>
             <div className="mt-10 max-w-2xl">
               <LiveProofFeed />
               <p className="mt-3 font-mono text-[11px] tracking-wide text-[var(--text-muted)]">
@@ -174,10 +228,14 @@ export function Landing() {
               and product share one visual language.
             </p>
           </BlurIn>
-          <BlurIn delay={0.1}>
-            <div className="max-w-md md:ml-auto">
+          <BlurIn delay={0.12}>
+            <motion.div
+              className="max-w-md md:ml-auto"
+              whileHover={reduce ? undefined : { y: -6 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+            >
               <PlayerTile player={previewPlayer} />
-            </div>
+            </motion.div>
           </BlurIn>
         </div>
       </section>
@@ -189,9 +247,13 @@ export function Landing() {
             <p className="section-kicker">Tracks</p>
             <h2 className="font-display text-3xl text-[var(--text-primary)]">Track fit</h2>
           </BlurIn>
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
-            <BlurIn delay={0.06}>
-              <div className="surface surface-interactive h-full p-6 md:p-8">
+          <StaggerReveal className="mt-10 grid gap-4 md:grid-cols-2">
+            <StaggerItem>
+              <motion.div
+                className="surface surface-interactive h-full p-6 md:p-8"
+                whileHover={reduce ? undefined : { y: -4 }}
+                transition={{ type: 'spring', stiffness: 360, damping: 26 }}
+              >
                 <p className="font-mono text-xs uppercase tracking-wider text-[var(--accent)]">
                   QVAC
                 </p>
@@ -199,10 +261,14 @@ export function Landing() {
                   On-device squad evaluation and trade decision logic. No cloud call on the reasoning
                   path.
                 </p>
-              </div>
-            </BlurIn>
-            <BlurIn delay={0.12}>
-              <div className="surface surface-interactive h-full p-6 md:p-8">
+              </motion.div>
+            </StaggerItem>
+            <StaggerItem>
+              <motion.div
+                className="surface surface-interactive h-full p-6 md:p-8"
+                whileHover={reduce ? undefined : { y: -4 }}
+                transition={{ type: 'spring', stiffness: 360, damping: 26 }}
+              >
                 <p className="font-mono text-xs uppercase tracking-wider text-[var(--accent)]">
                   WDK
                 </p>
@@ -210,9 +276,9 @@ export function Landing() {
                   Self-custodial agent wallets, signed settlement receipts, and spending limits
                   enforced at the wallet policy layer.
                 </p>
-              </div>
-            </BlurIn>
-          </div>
+              </motion.div>
+            </StaggerItem>
+          </StaggerReveal>
         </div>
       </section>
 
@@ -225,17 +291,19 @@ export function Landing() {
               Let the agent run the squad.
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-[var(--text-secondary)]">
-              Connect a WDK wallet and watch evaluation, negotiation, and USDt settlement on one
-              screen.
+              Create a WDK agent wallet and watch evaluation, negotiation, and USDt settlement on
+              one screen.
             </p>
-            <button
+            <motion.button
               type="button"
               className="btn-primary mt-9"
-              onClick={handleConnect}
-              disabled={connecting}
+              onClick={handleLaunch}
+              whileHover={reduce ? undefined : { scale: 1.03, y: -2 }}
+              whileTap={reduce ? undefined : { scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 24, ease: vaultEase }}
             >
-              {connecting ? 'Creating WDK wallet...' : 'Connect wallet'}
-            </button>
+              {connected ? 'Enter dashboard' : 'Connect wallet'}
+            </motion.button>
           </BlurIn>
         </div>
       </section>
